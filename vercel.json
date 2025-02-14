@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/optimize.py", "use": "@vercel/python" },
+    { "src": "package.json", "use": "@vercel/next" }
+  ],
+  "routes": [
+    { "src": "/api/optimize", "dest": "api/optimize.py" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}
