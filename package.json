@@ -9,7 +9,8 @@
   "dependencies": {
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "@tailwindcss/postcss": "latest"
   },
   "devDependencies": {
     "autoprefixer": "latest",
