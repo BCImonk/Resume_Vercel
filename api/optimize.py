@@ -45,7 +45,8 @@ async def optimize_resume(resume: UploadFile = File(...), jd: UploadFile = File(
         return JSONResponse(content={"optimized_resume": optimized_resume})
     except Exception as e:
         logger.exception("Error in optimize_resume endpoint:")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={"error": f"Internal server error: {str(e)}"}, status_code=500)
+
 
 def extract_text(file_path: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
