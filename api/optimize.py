@@ -1,52 +1,55 @@
 import os
 import shutil
+import logging
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 import openai
 from mangum import Mangum
 
-# Libraries for file parsing
+# File parsing libraries
 import PyPDF2
 import docx
 import textract
 from PIL import Image
 import pytesseract
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
-# Use an environment variable for your OpenAI API key.
+# Get your API key from environment variables
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "your_openai_api_key")
 
 @app.post("/optimize")
-async def optimize_resume(
-    resume: UploadFile = File(...),
-    jd: UploadFile = File(...)
-):
-    # Save uploaded files to a temporary directory (Vercel’s /tmp directory is writable)
-    resume_path = f"/tmp/{resume.filename}"
-    jd_path = f"/tmp/{jd.filename}"
-    
-    with open(resume_path, "wb") as buffer:
-        shutil.copyfileobj(resume.file, buffer)
-    with open(jd_path, "wb") as buffer:
-        shutil.copyfileobj(jd.file, buffer)
-    
-    # Extract text from both files
-    resume_text = extract_text(resume_path)
-    jd_text = extract_text(jd_path)
-    
-    # Call the LLM API to optimize the resume
-    optimized_resume = call_llm(resume_text, jd_text)
-    
-    # Return the optimized resume text (or a downloadable link if you later choose to generate a file)
-    return JSONResponse(content={"optimized_resume": optimized_resume})
+async def optimize_resume(resume: UploadFile = File(...), jd: UploadFile = File(...)):
+    try:
+        logger.info("Received optimize request.")
+        
+        # Save files to /tmp (writable on Vercel)
+        resume_path = f"/tmp/{resume.filename}"
+        jd_path = f"/tmp/{jd.filename}"
+        with open(resume_path, "wb") as buffer:
+            shutil.copyfileobj(resume.file, buffer)
+        with open(jd_path, "wb") as buffer:
+            shutil.copyfileobj(jd.file, buffer)
+        
+        # Extract text from files
+        resume_text = extract_text(resume_path)
+        jd_text = extract_text(jd_path)
+        
+        # Call the LLM API to optimize the resume
+        optimized_resume = call_llm(resume_text, jd_text)
+        logger.info("Resume optimized successfully.")
+        return JSONResponse(content={"optimized_resume": optimized_resume})
+    except Exception as e:
+        logger.exception("Error in optimize_resume endpoint:")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 def extract_text(file_path: str) -> str:
-    """
-    Extract text from file based on its extension.
-    Supported formats: .pdf, .doc, .docx, .png, .jpg, .jpeg, .txt
-    """
     ext = os.path.splitext(file_path)[1].lower()
+    logger.info(f"Extracting text from {file_path} with extension {ext}")
     try:
         if ext == ".txt":
             with open(file_path, "r", encoding="utf-8") as f:
@@ -70,15 +73,11 @@ def extract_text(file_path: str) -> str:
         else:
             text = f"Unsupported file extension: {ext}"
     except Exception as e:
+        logger.exception(f"Error extracting text from {file_path}")
         text = f"Error extracting text from file {file_path}: {str(e)}"
-    
     return text
 
 def call_llm(resume_text: str, jd_text: str) -> str:
-    """
-    Calls the OpenAI API to optimize the resume.
-    The prompt instructs the LLM to produce an ATS-optimized, keyword-rich, one-page resume.
-    """
     openai.api_key = OPENAI_API_KEY
     prompt = f"""
 Optimize the following resume based on the given job description.
@@ -97,5 +96,4 @@ Ensure the resume is ATS optimized, keyword-rich, and condensed to one page.
     )
     return response["choices"][0]["message"]["content"]
 
-# Create a Mangum handler for Vercel’s serverless Python runtime.
 handler = Mangum(app)
